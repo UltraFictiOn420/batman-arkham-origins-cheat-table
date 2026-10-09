@@ -1,0 +1,233 @@
+<?xml version='1.0' encoding='utf-8'?>
+<CheatTable CheatEngineTableVersion="45">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>1</ID>
+      <Description>"[Required] Initialize Arkham Origins - Original v1"</Description>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>[ENABLE]
+{$lua}
+if syntaxcheck then return end
+-- Original Origins v1: scoped data edits, no console or shared VM patches.
+if AO and AO.shutdown then AO.shutdown() end
+AO=nil
+openProcess('BatmanOrigins.exe')
+local base=getAddressSafe('BatmanOrigins.exe')
+if not base then error('Start Arkham Origins single-player and load into gameplay first.') end
+local C={pid=getOpenedProcessID(),flags={},names={},classes={},isa={},enemies={},tick=0,damageWrites=0}
+local function ri(a) if a then local ok,v=pcall(readInteger,a);if ok then return v end end end
+local function wi(a,v) return writeInteger(a,v) end
+local function rf(a) if a then local ok,v=pcall(readFloat,a);if ok then return v end end end
+local function bit(v,m) return v and v%(m*2)&gt;=m end
+C.gnames=base+0x14B1A98;C.gobjects=base+0x14B1ACC
+function C.name(i)
+  if not i or i&lt;0 then return end
+  if C.names[i] then return C.names[i] end
+  local count,data=ri(C.gnames+4),ri(C.gnames)
+  if not count or count&lt;1000 or count&gt;500000 or not data or i&gt;=count then return end
+  local e=ri(data+i*4);if not e or e&lt;0x10000 then return end
+  local encoding=ri(e);if not encoding then return end
+  local ok,n=pcall(readString,e+12,192,bit(encoding,1))
+  if ok and n and n~='' then C.names[i]=n;return n end
+end
+function C.oname(o) if o and o&gt;0x10000 then return C.name(ri(o+0x1C)) end end
+function C.class(o) return o and ri(o+0x24) end
+function C.cn(o)
+  local c=C.class(o);if not c or c&lt;0x10000 then return end
+  if not C.classes[c] then C.classes[c]=C.oname(c) end
+  return C.classes[c]
+end
+function C.isA(o,n)
+  local c=C.class(o);if not c then return false end
+  local key=tostring(c)..':'..n
+  if C.isa[key]~=nil then return C.isa[key] end
+  for _=1,50 do
+    if not c or c&lt;0x10000 then break end
+    if C.oname(c)==n then C.isa[key]=true;return true end
+    c=ri(c+0x38)
+  end
+  C.isa[key]=false;return false
+end
+function C.registered(o)
+  if getOpenedProcessID()~=C.pid or not o or o&lt;0x10000 then return false end
+  local count,data,index=ri(C.gobjects+4),ri(C.gobjects),ri(o+4)
+  return count and data and index and index&gt;=0 and index&lt;count and ri(data+index*4)==o
+end
+function C.live(o,n)
+  if not C.registered(o) or not C.isA(o,n) then return false end
+  local name=C.oname(o)
+  if not name or name:sub(1,9)=='Default__' then return false end
+  if C.isA(o,'Actor') and bit(ri(o+0xA0),8) then return false end
+  return true
+end
+local function bytes(a,n)
+  local ok,b=pcall(readBytes,a,n,true);if ok and b and #b==n then return b end
+end
+local function u32(b,i) return b[i]+b[i+1]*256+b[i+2]*65536+b[i+3]*16777216 end
+function C.scan()
+  if getOpenedProcessID()~=C.pid then return end
+  local count,data=ri(C.gobjects+4),ri(C.gobjects)
+  if not count or count&lt;1000 or count&gt;500000 or not data then return end
+  local raw=bytes(data,count*4);if not raw then return end
+  C.classes={};C.isa={}
+  local enemies,controller={},nil
+  for i=1,#raw,4 do
+    local o=u32(raw,i)
+    if o&gt;0x10000 then
+      local cn=C.cn(o)
+      if cn then
+        if cn:find('PlayerController') and C.live(o,'RPlayerController') then
+          local p=ri(o+0x1C8)
+          if C.live(p,'RPawnPlayer') then controller=o end
+        elseif cn:find('Pawn') and not cn:lower():find('boss') and C.live(o,'RBMPawnAI') and C.isA(o,'RPawnVillain') and not C.isA(o,'RPawnPlayer') then
+          enemies[#enemies+1]=o
+        end
+      end
+    end
+  end
+  C.controller,C.enemies=controller,enemies
+end
+function C.pawn()
+  if not C.live(C.controller,'RPlayerController') then return end
+  local p=ri(C.controller+0x1C8)
+  if C.live(p,'RPawnPlayer') then return p end
+end
+function C.status(s)
+  if C.statusAddress and getOpenedProcessID()==C.pid then pcall(writeString,C.statusAddress,s:sub(1,500)..'\0',false) end
+end
+function C.loop()
+  if getOpenedProcessID()~=C.pid then return end
+  C.tick=C.tick+1
+  if C.tick%40==0 then C.scan() end
+  local p=C.pawn()
+  if C.flags.health and p then
+    local max=ri(p+0x2E0)
+    if not max or max&lt;=0 then max=ri(p+0x10C8) end
+    local hp=ri(p+0x2DC)
+    -- Do not revive a dead pawn or override a scripted death transition.
+    if hp and hp&gt;0 and max and max&gt;0 and max&lt;100000 and hp&lt;max then wi(p+0x2DC,max) end
+  end
+  if C.flags.superDamage then
+    for _,e in ipairs(C.enemies) do
+      if C.live(e,'RBMPawnAI') and C.isA(e,'RPawnVillain') and not C.isA(e,'RPawnPlayer') and not (C.cn(e) or ''):lower():find('boss') then
+        local hp,max=ri(e+0x2DC),rf(e+0xBF0)
+        if hp and hp&gt;0 and hp&lt;100000 and max and max==max and max&gt;0 and max&lt;100000 then
+          local cap=math.max(1,math.floor(max/10))
+          if hp&gt;cap then if wi(e+0x2DC,cap) then C.damageWrites=C.damageWrites+1 end end
+        end
+      end
+    end
+  end
+  if C.tick%10==0 then
+    C.status(string.format('v1 | %s | HP %s/%s | Health %s | Super Damage %s | Enemies %d | HP edits %d',p and C.cn(p) or 'waiting for player',tostring(p and ri(p+0x2DC) or '?'),tostring(p and ri(p+0x2E0) or '?'),C.flags.health and 'ON' or 'OFF',C.flags.superDamage and 'ON' or 'OFF',#C.enemies,C.damageWrites))
+  end
+end
+function C.setFlag(key,on)
+  if key~='health' and key~='superDamage' then error('Unknown Origins option.') end
+  C.flags[key]=on
+  if on then C.scan();C.loop() end
+end
+-- Verify reflected offsets before allowing any gameplay write.
+if C.name(0)~='None' then error('Unsupported Origins name registry.') end
+local count,data=ri(C.gobjects+4),ri(C.gobjects)
+if not count or count&lt;1000 or count&gt;500000 or not data then error('Unsupported Origins object registry.') end
+local required={['Pawn.Health']=0x2DC,['Pawn.HealthMax']=0x2E0,['RPawnPlayer.MaxHealth']=0x10C8,['Controller.Pawn']=0x1C8,['RBMPawnAI.MaxHealth']=0xBF0,['Actor.bDeleteMe']=0xA0}
+local raw=bytes(data,count*4);if not raw then error('Cannot read Origins metadata.') end
+for i=1,#raw,4 do
+  local o=u32(raw,i);local cn=o&gt;0x10000 and C.cn(o)
+  if cn and cn:sub(-8)=='Property' then
+    local key=(C.oname(ri(o+0x18)) or '')..'.'..(C.oname(o) or '')
+    if required[key] then
+      local packed=ri(o+0x3C)
+      if not packed or math.floor(packed/65536)~=required[key] or packed%65536~=4 then error('Unsupported field layout: '..key) end
+      if key=='Actor.bDeleteMe' and ri(o+0x58)~=8 then error('Unsupported actor lifetime flag.') end
+      required[key]=nil
+    end
+  end
+end
+for key in pairs(required) do error('Required Origins metadata missing: '..key) end
+C.scan()
+if not C.pawn() then error('Load Origins single-player into gameplay before initializing.') end
+C.statusAddress=allocateMemory(512)
+if not C.statusAddress then error('Unable to allocate table status.') end
+registerSymbol('AO_RuntimeStatus',C.statusAddress,true)
+C.status('v1 initialized; cheats OFF')
+function C.shutdown()
+  if C.timer then C.timer.destroy();C.timer=nil end
+  C.flags={}
+  pcall(unregisterSymbol,'AO_RuntimeStatus')
+  if C.statusAddress and getOpenedProcessID()==C.pid then pcall(deAlloc,C.statusAddress) end
+end
+AO=C
+C.timer=createTimer(nil,false);C.timer.Interval=50
+C.timer.OnTimer=function()
+  if getOpenedProcessID()~=C.pid then C.timer.Enabled=false;return end
+  local ok,e=pcall(C.loop)
+  if not ok then C.timer.Enabled=false;C.status('PAUSED ERROR: '..tostring(e)) end
+end
+C.timer.Enabled=true
+
+{$asm}
+[DISABLE]
+{$lua}
+if syntaxcheck then return end
+if AO and AO.shutdown then AO.shutdown() end
+AO=nil
+{$asm}</AssemblerScript>
+      <Options moHideChildren="1" moDeactivateChildrenAsWell="1" />
+      <CheatEntries>
+        <CheatEntry>
+          <ID>2</ID>
+          <Description>"Runtime Status (read-only; no popup)"</Description>
+          <VariableType>String</VariableType>
+          <Length>500</Length>
+          <Unicode>0</Unicode>
+          <Address>AO_RuntimeStatus</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>11</ID>
+          <Description>"Infinite Health [Needs combat test]"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+{$lua}
+if syntaxcheck then return end
+if not AO then error('Enable Initialize Arkham Origins first.') end
+AO.setFlag('health',true)
+{$asm}
+[DISABLE]
+{$lua}
+if syntaxcheck then return end
+if AO then AO.setFlag('health',false) end
+{$asm}</AssemblerScript>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>22</ID>
+          <Description>"Super Damage (enemy HP / 10) [-] [Needs combat test]"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+{$lua}
+if syntaxcheck then return end
+if not AO then error('Enable Initialize Arkham Origins first.') end
+AO.setFlag('superDamage',true)
+{$asm}
+[DISABLE]
+{$lua}
+if syntaxcheck then return end
+if AO then AO.setFlag('superDamage',false) end
+{$asm}</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>189</Key>
+              </Keys>
+              <ID>0</ID>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols />
+  <Comments>Original Origins v1 for Steam single-player BatmanOrigins.exe. First testing build: health replenishment and enemy-health reduction to one-tenth (effective super damage, not a literal outgoing-damage multiplier). No console, input, scan, story, armor, or shared bytecode changes. Reflected fields verified before enabling. Player located through the live controlled pawn; class defaults and deleted actors excluded. Boss-named classes excluded, but disable Super Damage for tutorials, bosses, interrogations, and scripted encounters until tested. Reduced enemy HP is not restored on disable; it persists until respawn/reload. Batarang knockout behavior has NOT been implemented or verified. Periodic health replenishment is not true invulnerability: scripted deaths/instant lethal damage remain possible. Reinitialize after restarting game. Hotkey main keyboard minus toggles Super Damage. No popup logging. Back up saves; do not combine with other tables. Author code is our own; no third-party table code imported.</Comments>
+</CheatTable>

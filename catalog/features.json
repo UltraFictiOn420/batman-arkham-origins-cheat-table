@@ -1,0 +1,65 @@
+[
+  {
+    "mode": "Single-player Steam PC",
+    "category": "survival",
+    "code_type": "Cheat Engine Lua",
+    "status": "User confirmed v1",
+    "feature": "Infinite Health"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "combat",
+    "code_type": "Cheat Engine Lua",
+    "status": "User confirmed v1",
+    "feature": "Super Damage melee"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "combat",
+    "code_type": "Cheat Engine Lua",
+    "status": "Needs gameplay testing",
+    "feature": "One-Hit / Batarang KO"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "combat",
+    "code_type": "Cheat Engine Lua",
+    "status": "Needs gameplay testing",
+    "feature": "Freeze Enemies"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "reach",
+    "code_type": "Cheat Engine Lua",
+    "status": "Needs gameplay testing",
+    "feature": "Grapple / Batarang range"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "upgrades",
+    "code_type": "Cheat Engine Lua",
+    "status": "Needs gameplay testing; persistent save effect",
+    "feature": "Minimum 99 available points"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "missions",
+    "code_type": "Cheat Engine Lua",
+    "status": "Awaiting standalone user confirmation",
+    "feature": "Anarky countdown hold v5"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "challenge",
+    "code_type": "Cheat Engine Lua",
+    "status": "Experimental; not medal verified",
+    "feature": "HUD score and timers"
+  },
+  {
+    "mode": "Single-player Steam PC",
+    "category": "positions",
+    "code_type": "Cheat Engine Lua",
+    "status": "Needs Origins gameplay testing",
+    "feature": "Save / teleport / undo / upward hotkeys"
+  }
+]

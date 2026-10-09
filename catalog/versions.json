@@ -1,0 +1,27 @@
+[
+  {
+    "status": "User reported health and melee damage working",
+    "version": 1,
+    "file": "tables/history/v1/Batman Arkham Origins - Original v1.CT"
+  },
+  {
+    "status": "Expanded baseline; mostly awaiting gameplay tests",
+    "version": 2,
+    "file": "tables/history/v2/Batman Arkham Origins - Original v2.CT"
+  },
+  {
+    "status": "First bomb froze with temporary helper also involved",
+    "version": 3,
+    "file": "tables/history/v3/Batman Arkham Origins - Original v3.CT"
+  },
+  {
+    "status": "User reported subsequent timer failed",
+    "version": 4,
+    "file": "tables/history/v4/Batman Arkham Origins - Original v4.CT"
+  },
+  {
+    "status": "Replaces ignored pause flag with remaining-time hold; awaiting user test",
+    "version": 5,
+    "file": "tables/latest-test/v5/Batman Arkham Origins - Original v5.CT"
+  }
+]
